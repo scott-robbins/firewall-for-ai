@@ -1,7 +1,8 @@
 /**
  * For more details on how to configure Wrangler, refer to:
  * https://developers.cloudflare.com/workers/wrangler/configuration/
- */ {
+ */
+{
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "firewall-for-ai",
 	"main": "src/index.ts",
@@ -17,5 +18,11 @@
 	"ai": {
 		"binding": "AI"
 	},
-	"upload_source_maps": true
+	"upload_source_maps": true,
+	"routes": [
+		{
+			"pattern": "firewall-for-ai.jolenesego.com/*",
+			"zone_id": "77f4342b318da8ee5e052826a9333855"
+		}
+	]
 }
