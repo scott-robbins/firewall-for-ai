@@ -56,7 +56,33 @@ async function handleChatRequest(
 	request: Request,
 	env: Env,
 ): Promise<Response> {
+    // --- START WAF BLOCK CHECK LOGIC ---
+    // Check for mitigation headers injected by the WAF before it runs a block/challenge action.
+    const wafAction = request.headers.get("cf-mitigated-action"); 
+    const threatScoreHeader = request.headers.get("cf-threat-score");
+    const threatScore = threatScoreHeader ? parseInt(threatScoreHeader) : null;
+
+    // We check if the WAF was set to 'managed_challenge' or if the threat score 
+    // is extremely high (e.g., indicating a high-confidence bot or malicious prompt).
+    if (wafAction === "managed_challenge" || (threatScore && threatScore >= 90)) {
+        // Stop execution here and return a clean, custom JSON message.
+        // The status 403 (Forbidden) is appropriate for a security block.
+        return new Response(
+            JSON.stringify({
+                error: "Request blocked due to security policy.",
+                details: "Sensitive data (PII/Unsafe Content) was detected in the prompt. Review your input.",
+                action_taken: wafAction || "High-Score Block",
+            }),
+            {
+                status: 403, 
+                headers: { "content-type": "application/json" },
+            },
+        );
+    }
+    // --- END WAF BLOCK CHECK LOGIC ---
+    
 	try {
+		// If the WAF signal is clean, proceed to LLM inference
 		// Parse JSON request body
 		const { messages = [] } = (await request.json()) as {
 			messages: ChatMessage[];
@@ -77,9 +103,9 @@ async function handleChatRequest(
 				returnRawResponse: true,
 				// Uncomment to use AI Gateway
 				// gateway: {
-				//   id: "YOUR_GATEWAY_ID", // Replace with your AI Gateway ID
-				//   skipCache: false,      // Set to true to bypass cache
-				//   cacheTtl: 3600,        // Cache time-to-live in seconds
+				//   id: "YOUR_GATEWAY_ID", // Replace with your AI Gateway ID
+				//   skipCache: false,      // Set to true to bypass cache
+				//   cacheTtl: 3600,        // Cache time-to-live in seconds
 				// },
 			},
 		);
