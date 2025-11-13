@@ -24,13 +24,4 @@
 	]
 }
 
-### Critical Points to Verify Manually:
 
-1.  **Comma After `true`:** The line `"upload_source_maps": true` **must** have a comma directly after `true` to separate it from the `routes` block below.
-2.  **No Trailing Commas:** There must be **NO comma** after the closing brace of the last item in the `routes` array (the line where `zone_id` ends).
-3.  **No Trailing Comma at End of File:** Since `"routes"` is the final property in the main object, there must be **NO comma** after its closing bracket (`]`) before the final closing brace (`}`).
-
-If the file matches this content, the structure is correct. The failure is then likely related to an **outdated version of `wrangler`** not fully supporting the latest configuration schema. If the redeploy fails again, your next step should be to update the Wrangler CLI:
-
-```bash
-npm install -g wrangler@latest
