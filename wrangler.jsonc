@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "firewall-for-ai",
+	"name": "llm-chat-app-template2",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-10-08",
 	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -22,6 +22,7 @@
 	"routes": [
 		{
 			"pattern": "firewall-for-ai.jolenesego.com/*",
+			"zone_name": "jolenesego.com",
 			"zone_id": "77f4342b318da8ee5e052826a9333855"
 		}
 	]
