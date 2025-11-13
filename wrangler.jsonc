@@ -18,7 +18,7 @@
 	"ai": {
 		"binding": "AI"
 	},
-	"upload_source_maps": true,
+	"upload_source_maps": true, 
 	"routes": [
 		{
 			"pattern": "firewall-for-ai.jolenesego.com/*",
