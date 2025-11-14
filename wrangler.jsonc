@@ -15,12 +15,12 @@
 		"binding": "AI"
 	},
 	"upload_source_maps": true,
+    
+    // FIX 1: Move the zone ID here (at the root level).
+	"zone_id": "77f4342b318da8ee5e052826a9333855",
+
+	// FIX 2: Simplify routes to be a string array of patterns.
 	"routes": [
-		{
-			"pattern": "firewall-for-ai.jolenesego.com/*",
-			"zone_name": "jolenesego.com",
-			"zone_id": "77f4342b318da8ee5e052826a9333855"
-		}
+		"firewall-for-ai.jolenesego.com/*"
 	]
 }
-
