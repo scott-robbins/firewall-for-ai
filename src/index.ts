@@ -57,7 +57,7 @@ async function handleChatRequest(
 	env: Env,
 ): Promise<Response> {
     
-    // --- START WAF SIGNAL CHECK FIX ---
+    // --- START WAF SIGNAL CHECK FIX (Header Check) ---
     
     // Cloudflare injects these headers if a security rule is triggered (even if set to Log/Challenge)
     const wafAction = request.headers.get("cf-mitigated-action"); 
@@ -117,13 +117,36 @@ async function handleChatRequest(
 		// Return streaming response
 		return response;
 	} catch (error) {
-		console.error("Error processing chat request:", error);
+        // --- START FINAL CATCH BLOCK FIX ---
+        const errorText = error instanceof Error ? error.message : String(error);
+        console.error("Error processing chat request:", errorText);
+        
+        // If the error message indicates a security/policy failure from the LLM, 
+        // return the custom message instead of the generic 500 error.
+        if (errorText.toLowerCase().includes('policy violation') || 
+            errorText.toLowerCase().includes('safety') || 
+            errorText.toLowerCase().includes('content blocked')
+        ) {
+            return new Response(
+                JSON.stringify({ 
+                    error: "Input blocked due to security rules.",
+                    details: "Sensitive content (PII/Unsafe Content) was detected in the prompt."
+                }),
+                {
+                    status: 403, // Return 403 Forbidden on security-related crash
+                    headers: { "content-type": "application/json" },
+                },
+            );
+        }
+
+        // Default: Generic error for all other unhandled crashes (network, JSON parsing, etc.)
 		return new Response(
-			JSON.stringify({ error: "Failed to process request" }),
+			JSON.stringify({ error: "Sorry, there was an error processing your request." }),
 			{
 				status: 500,
 				headers: { "content-type": "application/json" },
 			},
 		);
+        // --- END FINAL CATCH BLOCK FIX ---
 	}
 }
