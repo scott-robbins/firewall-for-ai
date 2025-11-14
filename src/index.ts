@@ -64,8 +64,8 @@ async function handleChatRequest(
     const threatScoreHeader = request.headers.get("cf-threat-score");
     const threatScore = threatScoreHeader ? parseInt(threatScoreHeader) : null;
 
-    // We now check for ANY WAF mitigation signal (action or high score) to confirm the block occurred.
-    // We are no longer relying on a specific string match like 'managed_challenge'.
+    // Check for a high-confidence threat signal (e.g., a challenge action or high threat score)
+    // This intercepts the block signal before the code proceeds to the LLM call and crashes.
     if (
         wafAction || 
         (threatScore !== null && threatScore >= 90)
