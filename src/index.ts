@@ -56,33 +56,37 @@ async function handleChatRequest(
 	request: Request,
 	env: Env,
 ): Promise<Response> {
-    // --- START WAF BLOCK CHECK LOGIC ---
-    // Check for mitigation headers injected by the WAF before it runs a block/challenge action.
+    
+    // --- START WAF SIGNAL CHECK FIX ---
+    
+    // Cloudflare injects these headers if a security rule is triggered (even if set to Log/Challenge)
     const wafAction = request.headers.get("cf-mitigated-action"); 
     const threatScoreHeader = request.headers.get("cf-threat-score");
     const threatScore = threatScoreHeader ? parseInt(threatScoreHeader) : null;
 
-    // We check if the WAF was set to 'managed_challenge' or if the threat score 
-    // is extremely high (e.g., indicating a high-confidence bot or malicious prompt).
-    if (wafAction === "managed_challenge" || (threatScore && threatScore >= 90)) {
-        // Stop execution here and return a clean, custom JSON message.
-        // The status 403 (Forbidden) is appropriate for a security block.
+    // Check for a high-confidence threat signal (e.g., a challenge action or high threat score)
+    // This intercepts the block signal before the code proceeds to the LLM call and crashes.
+    if (
+        wafAction === "managed_challenge" || 
+        (threatScore !== null && threatScore >= 90)
+    ) {
+        console.warn(`WAF/Bot signal detected (Action: ${wafAction}, Score: ${threatScore}). Blocking request in Worker.`);
+        
+        // Return a clean, custom JSON block message immediately.
         return new Response(
-            JSON.stringify({
-                error: "Request blocked due to security policy.",
-                details: "Sensitive data (PII/Unsafe Content) was detected in the prompt. Review your input.",
-                action_taken: wafAction || "High-Score Block",
+            JSON.stringify({ 
+                error: "Policy Violation: Input blocked due to security rules.",
+                details: "Sensitive content (PII/Unsafe Content) was detected in the prompt. Please adjust your input."
             }),
             {
-                status: 403, 
+                status: 403, // Return Forbidden status
                 headers: { "content-type": "application/json" },
             },
         );
     }
-    // --- END WAF BLOCK CHECK LOGIC ---
-    
+    // --- END WAF SIGNAL CHECK FIX ---
+
 	try {
-		// If the WAF signal is clean, proceed to LLM inference
 		// Parse JSON request body
 		const { messages = [] } = (await request.json()) as {
 			messages: ChatMessage[];
