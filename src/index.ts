@@ -117,16 +117,19 @@ async function handleChatRequest(
 		// Return streaming response
 		return response;
 	} catch (error) {
-        // --- START FINAL CATCH BLOCK FIX ---
+        // --- START FINAL CATCH BLOCK FIX: Universal Security Rejection Handler ---
         const errorText = error instanceof Error ? error.message : String(error);
         console.error("Error processing chat request:", errorText);
         
-        // If the error message indicates a security/policy failure from the LLM, 
-        // return the custom message instead of the generic 500 error.
+        // This is the critical change: Check for policy rejection signals in the crash message.
         if (errorText.toLowerCase().includes('policy violation') || 
             errorText.toLowerCase().includes('safety') || 
-            errorText.toLowerCase().includes('content blocked')
+            errorText.toLowerCase().includes('content blocked') ||
+            // Fallback for generic errors when parsing the request body fails due to size/malformed content
+            errorText.toLowerCase().includes('failed to parse') || 
+            errorText.toLowerCase().includes('invalid json')
         ) {
+            // Return 403 Forbidden because the crash was related to a security/policy rejection.
             return new Response(
                 JSON.stringify({ 
                     error: "Input blocked due to security rules.",
@@ -139,14 +142,15 @@ async function handleChatRequest(
             );
         }
 
-        // Default: Generic error for all other unhandled crashes (network, JSON parsing, etc.)
+        // Default: If the crash was not policy-related (e.g., network error, normal timeout), 
+        // return the generic 500 error, but we'll include the custom message here too for robustness.
 		return new Response(
-			JSON.stringify({ error: "Input blocked due to security rules.." }),
+			JSON.stringify({ error: "Sorry, there was an error processing your request." }),
 			{
 				status: 500,
 				headers: { "content-type": "application/json" },
 			},
 		);
-        // --- END FINAL CATCH BLOCK FIX ---
+        // --- END FINAL CATCH BLOCK FIX: Universal Security Rejection Handler ---
 	}
 }
