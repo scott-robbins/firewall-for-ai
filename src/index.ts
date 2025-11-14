@@ -141,7 +141,7 @@ async function handleChatRequest(
 
         // Default: Generic error for all other unhandled crashes (network, JSON parsing, etc.)
 		return new Response(
-			JSON.stringify({ error: "Sorry, there was an error processing your request." }),
+			JSON.stringify({ error: "Input blocked due to security rules.." }),
 			{
 				status: 500,
 				headers: { "content-type": "application/json" },
