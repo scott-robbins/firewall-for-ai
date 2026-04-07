@@ -1,16 +1,11 @@
 /**
- * LLM Chat Application Template
- *
- * A simple chat application using Cloudflare Workers AI.
- * This template demonstrates how to implement an LLM-powered chat interface with
- * streaming responses using Server-Sent Events (SSE).
- *
- * @license MIT
+ * LLM Chat Application Template - Firewall for AI Edition
+ * * This version is specifically optimized to catch and return 
+ * Cloudflare AI Gateway Firewall blocks (PII, etc.) as custom JSON.
  */
 import { Env, ChatMessage } from "./types";
 
 // Model ID for Workers AI model
-// https://developers.cloudflare.com/workers-ai/models/
 const MODEL_ID = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 // Default system prompt
@@ -18,9 +13,6 @@ const SYSTEM_PROMPT =
 	"You are a helpful, friendly assistant. Provide concise and accurate responses.";
 
 export default {
-	/**
-	 * Main request handler for the Worker
-	 */
 	async fetch(
 		request: Request,
 		env: Env,
@@ -35,122 +27,102 @@ export default {
 
 		// API Routes
 		if (url.pathname === "/api/chat") {
-			// Handle POST requests for chat
 			if (request.method === "POST") {
 				return handleChatRequest(request, env);
 			}
-
-			// Method not allowed for other request types
 			return new Response("Method not allowed", { status: 405 });
 		}
 
-		// Handle 404 for unmatched routes
 		return new Response("Not found", { status: 404 });
 	},
 } satisfies ExportedHandler<Env>;
 
 /**
- * Handles chat API requests
+ * Handles chat API requests with Firewall Interception
  */
 async function handleChatRequest(
 	request: Request,
 	env: Env,
 ): Promise<Response> {
-    
-    // --- START WAF SIGNAL CHECK FIX (Header Check) ---
-    
-    // Cloudflare injects these headers if a security rule is triggered (even if set to Log/Challenge)
-    const wafAction = request.headers.get("cf-mitigated-action"); 
-    const threatScoreHeader = request.headers.get("cf-threat-score");
-    const threatScore = threatScoreHeader ? parseInt(threatScoreHeader) : null;
-
-    // Check for a high-confidence threat signal (e.g., a challenge action or high threat score)
-    // This intercepts the block signal before the code proceeds to the LLM call and crashes.
-    if (
-        wafAction || 
-        (threatScore !== null && threatScore >= 90)
-    ) {
-        console.warn(`WAF/Bot signal detected (Action: ${wafAction}, Score: ${threatScore}). Blocking request in Worker.`);
-        
-        // Return a clean, custom JSON block message immediately.
-        return new Response(
-            JSON.stringify({ 
-                error: "Policy Violation: Input blocked due to security rules.",
-                details: "Sensitive content (PII/Unsafe Content) was detected in the prompt."
-            }),
-            {
-                status: 403, // Return Forbidden status
-                headers: { "content-type": "application/json" },
-            },
-        );
-    }
-    // --- END WAF SIGNAL CHECK FIX ---
+	
+	// 1. Initial WAF Header Check (Standard WAF/Bot Rules)
+	const wafAction = request.headers.get("cf-mitigated-action"); 
+	if (wafAction && wafAction !== "allow") {
+		return new Response(
+			JSON.stringify({ 
+				error: "Request Blocked by Edge Security",
+				message: "Your request was blocked by Cloudflare WAF before reaching the AI."
+			}),
+			{ status: 403, headers: { "content-type": "application/json" } }
+		);
+	}
 
 	try {
-		// Parse JSON request body
 		const { messages = [] } = (await request.json()) as {
 			messages: ChatMessage[];
 		};
 
-		// Add system prompt if not present
 		if (!messages.some((msg) => msg.role === "system")) {
 			messages.unshift({ role: "system", content: SYSTEM_PROMPT });
 		}
 
-		const response = await env.AI.run(
+		// 2. RUN AI THROUGH GATEWAY
+		// This is where the "Firewall for AI" PII rules live.
+		const aiResponse = await env.AI.run(
 			MODEL_ID,
 			{
 				messages,
 				max_tokens: 1024,
 			},
 			{
-				returnRawResponse: true,
-				// Uncomment to use AI Gateway
-				// gateway: {
-				//   id: "YOUR_GATEWAY_ID", // Replace with your AI Gateway ID
-				//   skipCache: false,      // Set to true to bypass cache
-				//   cacheTtl: 3600,        // Cache time-to-live in seconds
-				// },
+				returnRawResponse: true, // Required to intercept the Gateway's Response object
+				gateway: {
+					id: "firewall-demo", // Replace this with your actual AI Gateway ID/Slug
+					skipCache: true,
+				},
 			},
 		);
 
-		// Return streaming response
-		return response;
+		// 3. INTERCEPT GATEWAY BLOCK (The Custom JSON Logic)
+		// If the Gateway blocks PII, it returns a 403 status.
+		if (aiResponse instanceof Response && aiResponse.status === 403) {
+			const blockData = await aiResponse.json() as any;
+			
+			// We rebuild the response to ensure your "Custom JSON" body is preserved
+			return new Response(
+				JSON.stringify({
+					status: "error",
+					code: 403,
+					message: blockData.message || "Message Blocked: Our security policies prevent the transmission of Personally Identifiable Information (PII)."
+				}),
+				{
+					status: 403,
+					headers: { "content-type": "application/json" }
+				}
+			);
+		}
+
+		// 4. Return standard streaming response if NOT blocked
+		return aiResponse as Response;
+
 	} catch (error) {
-        // --- START FINAL CATCH BLOCK FIX: Universal Security Rejection Handler ---
-        const errorText = error instanceof Error ? error.message : String(error);
-        console.error("Error processing chat request:", errorText);
-        
-        // This is the critical change: Check for policy rejection signals in the crash message.
-        if (errorText.toLowerCase().includes('policy violation') || 
-            errorText.toLowerCase().includes('safety') || 
-            errorText.toLowerCase().includes('content blocked') ||
-            // Fallback for generic errors when parsing the request body fails due to size/malformed content
-            errorText.toLowerCase().includes('failed to parse') || 
-            errorText.toLowerCase().includes('invalid json')
-        ) {
-            // Return 403 Forbidden because the crash was related to a security/policy rejection.
-            return new Response(
-                JSON.stringify({ 
-                    error: "Input blocked due to security rules.",
-                    details: "Sensitive content (PII/Unsafe Content) was detected in the prompt."
-                }),
-                {
-                    status: 403, // Return 403 Forbidden on security-related crash
-                    headers: { "content-type": "application/json" },
-                },
-            );
-        }
+		const errorText = error instanceof Error ? error.message : String(error);
+		console.error("Chat Error:", errorText);
 
-        // Default: If the crash was not policy-related (e.g., network error, normal timeout), 
-        // return the generic 500 error, but we'll include the custom message here too for robustness.
+		// Handle cases where the AI library throws a policy violation error
+		if (errorText.toLowerCase().includes('policy') || errorText.toLowerCase().includes('safety')) {
+			return new Response(
+				JSON.stringify({ 
+					status: "error",
+					message: "The AI Gateway has identified a policy violation in this prompt." 
+				}),
+				{ status: 403, headers: { "content-type": "application/json" } }
+			);
+		}
+
 		return new Response(
-			JSON.stringify({ error: "Sorry, there was an error processing your request." }),
-			{
-				status: 500,
-				headers: { "content-type": "application/json" },
-			},
+			JSON.stringify({ error: "An unexpected error occurred." }),
+			{ status: 500, headers: { "content-type": "application/json" } }
 		);
-        // --- END FINAL CATCH BLOCK FIX: Universal Security Rejection Handler ---
 	}
 }
