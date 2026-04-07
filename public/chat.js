@@ -1,7 +1,6 @@
 /**
- * LLM Chat App Frontend
- *
- * Handles the chat UI interactions and communication with the backend API.
+ * LLM Chat App Frontend - Firewall for AI Edition
+ * * Updated to handle 403 Security Blocks and display custom JSON error messages.
  */
 
 // DOM elements
@@ -65,15 +64,6 @@ async function sendMessage() {
 	chatHistory.push({ role: "user", content: message });
 
 	try {
-		// Create new assistant response element
-		const assistantMessageEl = document.createElement("div");
-		assistantMessageEl.className = "message assistant-message";
-		assistantMessageEl.innerHTML = "<p></p>";
-		chatMessages.appendChild(assistantMessageEl);
-
-		// Scroll to bottom
-		chatMessages.scrollTop = chatMessages.scrollHeight;
-
 		// Send request to API
 		const response = await fetch("/api/chat", {
 			method: "POST",
@@ -85,10 +75,31 @@ async function sendMessage() {
 			}),
 		});
 
-		// Handle errors
+		// --- START SECURITY BLOCK LOGIC ---
+		// Check for the 403 Blocked status from the Firewall for AI
+		if (response.status === 403) {
+			const errorData = await response.json();
+			typingIndicator.classList.remove("visible");
+			
+			// Display the specific message from your Custom JSON response body
+			addMessageToChat(
+				"assistant",
+				`🚫 **Security Block:** ${errorData.message || "Request denied by security policy."}`
+			);
+			
+			return; // Exit early so we don't try to stream an error
+		}
+		// --- END SECURITY BLOCK LOGIC ---
+
 		if (!response.ok) {
 			throw new Error("Failed to get response");
 		}
+
+		// Create assistant response element for streaming
+		const assistantMessageEl = document.createElement("div");
+		assistantMessageEl.className = "message assistant-message";
+		assistantMessageEl.innerHTML = "<p></p>";
+		chatMessages.appendChild(assistantMessageEl);
 
 		// Process streaming response
 		const reader = response.body.getReader();
@@ -97,50 +108,48 @@ async function sendMessage() {
 
 		while (true) {
 			const { done, value } = await reader.read();
+			if (done) break;
 
-			if (done) {
-				break;
-			}
-
-			// Decode chunk
 			const chunk = decoder.decode(value, { stream: true });
-
-			// Process SSE format
 			const lines = chunk.split("\n");
+
 			for (const line of lines) {
+				if (!line.trim()) continue;
+				
 				try {
-					const jsonData = JSON.parse(line);
+					// Handling both raw text and data: SSE format if necessary
+					const cleanLine = line.replace(/^data: /, "").trim();
+					if (cleanLine === "[DONE]") break;
+
+					const jsonData = JSON.parse(cleanLine);
 					if (jsonData.response) {
-						// Append new content to existing text
 						responseText += jsonData.response;
 						assistantMessageEl.querySelector("p").textContent = responseText;
-
-						// Scroll to bottom
 						chatMessages.scrollTop = chatMessages.scrollHeight;
 					}
 				} catch (e) {
-					console.error("Error parsing JSON:", e);
+					// Fallback for non-JSON chunks
+					responseText += line;
+					assistantMessageEl.querySelector("p").textContent = responseText;
 				}
 			}
 		}
 
-		// Add completed response to chat history
 		chatHistory.push({ role: "assistant", content: responseText });
+
 	} catch (error) {
 		console.error("Error:", error);
 		addMessageToChat(
 			"assistant",
-			"Sorry, there was an error processing your request.",
+			"Sorry, there was an error processing your request."
 		);
 	} finally {
-		// Hide typing indicator
 		typingIndicator.classList.remove("visible");
-
-		// Re-enable input
 		isProcessing = false;
 		userInput.disabled = false;
 		sendButton.disabled = false;
 		userInput.focus();
+		chatMessages.scrollTop = chatMessages.scrollHeight;
 	}
 }
 
@@ -152,7 +161,5 @@ function addMessageToChat(role, content) {
 	messageEl.className = `message ${role}-message`;
 	messageEl.innerHTML = `<p>${content}</p>`;
 	chatMessages.appendChild(messageEl);
-
-	// Scroll to bottom
 	chatMessages.scrollTop = chatMessages.scrollHeight;
 }
