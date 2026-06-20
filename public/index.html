@@ -3,17 +3,22 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>LLM Chat App</title>
+		<title>AI Security for Apps Demo</title>
 		<style>
 			:root {
 				--primary-color: #f6821f;
 				--primary-hover: #e67e22;
+				--dark-bg: #1a1a1a;
+				--sidebar-bg: #232323;
 				--light-bg: #f9fafb;
 				--border-color: #e5e7eb;
 				--text-color: #1f2937;
 				--text-light: #6b7280;
 				--user-msg-bg: #fff2e6;
 				--assistant-msg-bg: #f3f4f6;
+				--block-bg: #fef2f2;
+				--block-border: #dc2626;
+				--block-text: #991b1b;
 			}
 
 			* {
@@ -23,68 +28,166 @@
 			}
 
 			body {
-				font-family:
-					-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
-					Cantarell, sans-serif;
-				line-height: 1.6;
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+				line-height: 1.5;
 				color: var(--text-color);
-				max-width: 800px;
-				margin: 0 auto;
-				padding: 1rem;
+				background: var(--light-bg);
+				min-height: 100vh;
 			}
 
-			header {
-				text-align: center;
-				margin-bottom: 2rem;
-				padding: 1rem 0;
-				border-bottom: 1px solid var(--border-color);
+			.app-header {
+				background: var(--dark-bg);
+				color: white;
+				padding: 1rem 2rem;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				border-bottom: 3px solid var(--primary-color);
 			}
 
-			h1 {
-				font-size: 1.5rem;
+			.app-header h1 {
+				font-size: 1.25rem;
 				color: var(--primary-color);
 			}
 
-			.chat-container {
+			.app-header .subtitle {
+				font-size: 0.85rem;
+				color: #ccc;
+			}
+
+			.app-layout {
+				display: flex;
+				height: calc(100vh - 70px);
+			}
+
+			.sidebar {
+				width: 320px;
+				background: var(--sidebar-bg);
+				color: white;
+				padding: 1.5rem 1rem;
+				overflow-y: auto;
+				border-right: 1px solid #333;
+			}
+
+			.sidebar h2 {
+				font-size: 0.9rem;
+				color: var(--primary-color);
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+				margin-bottom: 1rem;
+				padding-bottom: 0.5rem;
+				border-bottom: 1px solid #333;
+			}
+
+			.demo-button {
+				display: block;
+				width: 100%;
+				padding: 0.75rem 1rem;
+				margin-bottom: 0.75rem;
+				background: #2d2d2d;
+				color: white;
+				border: 1px solid #444;
+				border-radius: 6px;
+				cursor: pointer;
+				text-align: left;
+				transition: all 0.15s;
+				font-family: inherit;
+				font-size: 0.9rem;
+			}
+
+			.demo-button:hover {
+				background: var(--primary-color);
+				border-color: var(--primary-color);
+			}
+
+			.demo-button .button-title {
+				font-weight: 600;
+				margin-bottom: 0.25rem;
+			}
+
+			.demo-button .button-desc {
+				font-size: 0.75rem;
+				color: #aaa;
+			}
+
+			.demo-button:hover .button-desc {
+				color: #fff5e6;
+			}
+
+			.chat-main {
+				flex: 1;
 				display: flex;
 				flex-direction: column;
-				height: calc(100vh - 200px);
-				min-height: 400px;
-				border: 1px solid var(--border-color);
-				border-radius: 8px;
-				overflow: hidden;
+				background: white;
 			}
 
 			.chat-messages {
 				flex: 1;
 				overflow-y: auto;
-				padding: 1rem;
-				background-color: var(--light-bg);
+				padding: 1.5rem;
+				background: var(--light-bg);
 			}
 
 			.message {
 				margin-bottom: 1rem;
-				padding: 0.75rem;
+				padding: 0.75rem 1rem;
 				border-radius: 8px;
-				max-width: 80%;
+				max-width: 75%;
+				word-wrap: break-word;
 			}
 
 			.user-message {
-				background-color: var(--user-msg-bg);
-				align-self: flex-end;
+				background: var(--user-msg-bg);
 				margin-left: auto;
 			}
 
 			.assistant-message {
-				background-color: var(--assistant-msg-bg);
-				align-self: flex-start;
+				background: var(--assistant-msg-bg);
+				margin-right: auto;
+			}
+
+			.security-block-message {
+				background: var(--block-bg);
+				border: 2px solid var(--block-border);
+				color: var(--block-text);
+				max-width: 90%;
+				margin-right: auto;
+				padding: 1rem 1.25rem;
+			}
+
+			.block-header {
+				font-weight: 700;
+				font-size: 0.95rem;
+				color: var(--block-border);
+				margin-bottom: 0.5rem;
+				letter-spacing: 0.02em;
+			}
+
+			.block-rule-name, .block-category {
+				font-size: 0.85rem;
+				color: var(--block-text);
+				margin-bottom: 0.25rem;
+				font-weight: 600;
+			}
+
+			.block-message-body {
+				margin-top: 0.5rem;
+				color: var(--text-color);
+				font-size: 0.95rem;
+			}
+
+			.block-code {
+				margin-top: 0.5rem;
+				font-family: monospace;
+				font-size: 0.8rem;
+				color: var(--text-light);
 			}
 
 			.message-input {
 				display: flex;
-				padding: 0.75rem;
+				padding: 1rem;
 				border-top: 1px solid var(--border-color);
-				background-color: white;
+				background: white;
 			}
 
 			#user-input {
@@ -95,83 +198,102 @@
 				font-family: inherit;
 				resize: none;
 				min-height: 44px;
+				max-height: 120px;
 			}
 
 			#send-button {
 				margin-left: 0.5rem;
-				padding: 0 1rem;
-				background-color: var(--primary-color);
+				padding: 0 1.5rem;
+				background: var(--primary-color);
 				color: white;
 				border: none;
 				border-radius: 4px;
 				cursor: pointer;
-				transition: background-color 0.2s;
+				font-weight: 600;
+				transition: background 0.2s;
 			}
 
 			#send-button:hover {
-				background-color: var(--primary-hover);
+				background: var(--primary-hover);
 			}
 
 			#send-button:disabled {
-				background-color: var(--text-light);
+				background: var(--text-light);
 				cursor: not-allowed;
 			}
 
 			.typing-indicator {
 				display: none;
-				margin-bottom: 1rem;
+				padding: 0.5rem 1.5rem;
 				font-style: italic;
 				color: var(--text-light);
+				font-size: 0.85rem;
 			}
 
 			.typing-indicator.visible {
 				display: block;
 			}
-
-			footer {
-				margin-top: 1rem;
-				text-align: center;
-				font-size: 0.85rem;
-				color: var(--text-light);
-			}
 		</style>
 	</head>
 	<body>
-		<header>
-			<h1>Cloudflare AI Chat</h1>
-			<p>Powered by Cloudflare Workers AI</p>
+		<header class="app-header">
+			<div>
+				<h1>🛡️ AI Security for Apps Demo</h1>
+				<div class="subtitle">Powered by Cloudflare</div>
+			</div>
 		</header>
 
-		<div class="chat-container">
-			<div id="chat-messages" class="chat-messages">
-				<div class="message assistant-message">
-					<p>
-						Hello! I'm an LLM chat app powered by Cloudflare Workers AI. How can
-						I help you today?
-					</p>
+		<div class="app-layout">
+			<aside class="sidebar">
+				<h2>Demo Scenarios</h2>
+
+				<button class="demo-button" onclick="fireDemoPrompt('normal')">
+					<div class="button-title">💬 Normal Chat</div>
+					<div class="button-desc">Clean prompt, no rule triggered</div>
+				</button>
+
+				<button class="demo-button" onclick="fireDemoPrompt('pii')">
+					<div class="button-title">🪪 PII Detection</div>
+					<div class="button-desc">Blocks Credit Cards, Emails, Phone Numbers, Nationality</div>
+				</button>
+
+				<button class="demo-button" onclick="fireDemoPrompt('unsafe')">
+					<div class="button-title">⚠️ Unsafe Content</div>
+					<div class="button-desc">Blocks Violence, Hate, Self-Harm, Sexual Content</div>
+				</button>
+
+				<button class="demo-button" onclick="fireDemoPrompt('tokenLimit')">
+					<div class="button-title">📏 Prompt Too Long</div>
+					<div class="button-desc">Blocks prompts over 50 tokens</div>
+				</button>
+
+				<button class="demo-button" onclick="fireDemoPrompt('regex')">
+					<div class="button-title">🔒 Project Code Leak</div>
+					<div class="button-desc">Custom Regex — Blocks internal Project Phoenix IDs</div>
+				</button>
+			</aside>
+
+			<main class="chat-main">
+				<div id="chat-messages" class="chat-messages">
+					<div class="message assistant-message">
+						<p>Welcome to the AI Security for Apps demo. Click a scenario button on the left to see Cloudflare's security protections in action, or type your own prompt to test the rules.</p>
+					</div>
 				</div>
-			</div>
 
-			<div class="typing-indicator" id="typing-indicator">
-				AI is thinking...
-			</div>
+				<div class="typing-indicator" id="typing-indicator">AI is thinking...</div>
 
-			<div class="message-input">
-				<textarea
-					id="user-input"
-					placeholder="Type your message here..."
-					rows="1"
-					autofocus
-				></textarea>
-				<button id="send-button">Send</button>
-			</div>
+				<div class="message-input">
+					<textarea
+						id="user-input"
+						placeholder="Type your message here or click a demo scenario..."
+						rows="1"
+						autofocus
+					></textarea>
+					<button id="send-button">Send</button>
+				</div>
+			</main>
 		</div>
 
-		<footer>
-			<p>Cloudflare Workers AI Chat Template &copy; 2025</p>
-		</footer>
-
-		<!-- Chat app script -->
 		<script src="chat.js"></script>
 	</body>
 </html>
