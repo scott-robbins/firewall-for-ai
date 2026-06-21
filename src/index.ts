@@ -69,19 +69,15 @@ async function handleChatRequest(
 		// 2. RUN AI THROUGH GATEWAY
 		// This is where the "Firewall for AI" PII rules live.
 		const aiResponse = await env.AI.run(
-			MODEL_ID,
-			{
-				messages,
-				max_tokens: 1024,
-			},
-			{
-				returnRawResponse: true, // Required to intercept the Gateway's Response object
-				gateway: {
-					id: "firewall-demo", // Replace this with your actual AI Gateway ID/Slug
-					skipCache: true,
-				},
-			},
-		);
+    MODEL_ID,
+    {
+        messages,
+        max_tokens: 1024,
+    },
+    {
+        returnRawResponse: true,
+    },
+);
 
 		// 3. INTERCEPT GATEWAY BLOCK (The Custom JSON Logic)
 		// If the Gateway blocks PII, it returns a 403 status.
