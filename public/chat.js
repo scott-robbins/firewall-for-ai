@@ -86,6 +86,7 @@ async function sendMessage() {
 			const errorData = await response.json();
 			typingIndicator.classList.remove("visible");
 			addSecurityBlockToChat(errorData);
+			chatHistory.pop();
 			return;
 		}
 
